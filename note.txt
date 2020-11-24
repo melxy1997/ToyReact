@@ -1,0 +1,7 @@
+协调的核心就是diff
+React中的diff与Vue的diff是不同的
+Fiber是React16中的协调引擎，增量式渲染，新的实现方式（链表
+用JS对象表示DOM的信息与结构，状态变更时 先重新渲染这个JS对象，即为virtual DOM
+
+老师用CRA创建的项目
+老师的VSC插件在github有React相关的article
