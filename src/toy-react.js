@@ -1,4 +1,4 @@
-
+const RENDER_TO_DOM = Symbol("render to DOM")
 export class Component {
     constructor() {
         this._root = null;
@@ -13,15 +13,11 @@ export class Component {
     appendChild(component) {
         this.children.push(component);
     }
-    // getter的写法
-    get root() {
-        //如果没有root，让它render出一个对象(它理应是有root的)
-        if(!this._root) {
-            this._root = this.render().root;
-            // 如果render出的没有root，会递归进来 直到它是我们创建的wrapper一定有root
-        }
-        // 默认功能就是访问私有变量
-        return this._root;
+
+    // 操作&重新渲染，这里使用了Symbol，方括号形式
+    [RENDER_TO_DOM](range) {
+        //使用Range的API来定位
+        this.render()[RENDER_TO_DOM](range);//替代了getRoot的方式
     }
 
 }
@@ -39,6 +35,11 @@ class ElementWarpper {
         this.root.appendChild(component.root);
     }
 
+    [RENDER_TO_DOM](range) {
+        range.deleteContent();
+        range.insertNode(this.root);
+    }
+
 }
 
 class TextWarpper {
@@ -46,6 +47,11 @@ class TextWarpper {
         this.root = document.createTextNode(content);
     }
     // Text不会有子节点，也不会append子节点
+
+    [RENDER_TO_DOM](range) {
+        range.deleteContent();
+        range.insertNode(this.root);
+    }
 }
 
 export function createElement(type, attributes, ...children) {
