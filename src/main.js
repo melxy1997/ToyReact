@@ -8,7 +8,7 @@ class MyComponent extends Component {
     }
     render() {
         return <div>asd
-            <h1>{this.children}</h1>
+            <button onclick={()=>{ this.state.a++; this.rerender(); }}>Add</button>
             <h2>a:{this.state.a.toString()}</h2>
         </div>;
     }

@@ -4,9 +4,11 @@ export class Component {
         this._root = null;
         this.props = Object.create(null); //为何不使用{}？因为它不如Object.creat出创建的更空，无原型链的任何继承
         this.children = [];
+        this._range = null;
     }
 
     setAttribute(name, value) {
+
         this.props[name] = value;
     }
 
@@ -19,6 +21,12 @@ export class Component {
     [RENDER_TO_DOM](range) {
         //使用Range的API来定位
         this.render()[RENDER_TO_DOM](range);//替代了getRoot的方式
+        this._range = range;
+    }
+
+    rerender() {
+        this._range.deleteContents();
+        this[RENDER_TO_DOM](this._range);
     }
 
 }
@@ -29,6 +37,14 @@ class ElementWarpper {
     }
 
     setAttribute(name, value) {
+        // 希望把on开头的属性单独处理 因为它是事件绑定
+        // 使用正则进行匹配 [\s\S]表示所有的空白与非空白集合 即全部字符
+        if(name.match(/^on([\s\S]+)$/)) {
+            console.log("Match Event!");
+            // 由于使用了()，则可以捕获到该位置的值
+            // 确保事件名是小写的
+            this.root.addEventListener(RegExp.$1.replace(/^[\s\S]/, c=> c.toLowerCase()), value)
+        }
         this.root.setAttribute(name, value);
     }
 
