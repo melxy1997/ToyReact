@@ -12,6 +12,7 @@ export class Component {
 
     appendChild(component) {
         this.children.push(component);
+
     }
 
     // 操作&重新渲染，这里使用了Symbol，方括号形式
@@ -32,11 +33,17 @@ class ElementWarpper {
     }
 
     appendChild(component) {
-        this.root.appendChild(component.root);
+        // this.root.appendChild(component.root);
+        // 使用range+render代替root
+        let range = document.createRange();
+        // 既然是append肯定是在末尾 因此range的起始于结尾都在root的尾部
+        range.setStart(this.root, this.root.childNodes.length);
+        range.setEnd(this.root, this.root.childNodes.length);
+        component[RENDER_TO_DOM](range);
     }
 
     [RENDER_TO_DOM](range) {
-        range.deleteContent();
+        range.deleteContents();
         range.insertNode(this.root);
     }
 
@@ -49,7 +56,7 @@ class TextWarpper {
     // Text不会有子节点，也不会append子节点
 
     [RENDER_TO_DOM](range) {
-        range.deleteContent();
+        range.deleteContents();
         range.insertNode(this.root);
     }
 }
@@ -104,7 +111,14 @@ export function createElement(type, attributes, ...children) {
 }
 
 export function render(component, parentElement) {
-    parentElement.appendChild(component.root);
+    // parentElement.appendChild(component.root);
+    // 注意此处使用rangeAPI的方式，有Start和End，根据parentElementd的长度设定
+    // 把parentElement的内容清空，然后render to DOM
+    let range = document.createRange();
+    range.setStart(parentElement, 0);
+    range.setEnd(parentElement, parentElement.childNodes.length)
+    range.deleteContents();
+    component[RENDER_TO_DOM](range);
 }
 
 
