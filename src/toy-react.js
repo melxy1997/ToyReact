@@ -2,9 +2,9 @@ const RENDER_TO_DOM = Symbol("render to DOM")
 export class Component {
     constructor() {
         this._root = null;
+        this._range = null;
         this.props = Object.create(null); //为何不使用{}？因为它不如Object.creat出创建的更空，无原型链的任何继承
         this.children = [];
-        this._range = null;
     }
 
     setAttribute(name, value) {
@@ -66,13 +66,21 @@ export class Component {
         this.rerender();
     }
 
-}
-
-class ElementWarpper {
-    constructor(type) {
-        this.root = document.createElement(type);
+    get vdom() {
+        // 可能会出现递归
+        return this.render().vdom;
     }
 
+}
+
+class ElementWarpper extends Component{
+    constructor(type) {
+        super(type)
+        this.type = type
+        this.root = document.createElement(type);
+    }
+/*
+    // 设置this.props
     setAttribute(name, value) {
         // 希望把on开头的属性单独处理 因为它是事件绑定
         // 使用正则进行匹配 [\s\S]表示所有的空白与非空白集合 即全部字符
@@ -90,7 +98,7 @@ class ElementWarpper {
             }
         }
     }
-
+    // 设置this.children
     appendChild(component) {
         // this.root.appendChild(component.root);
         // 使用range+render代替root
@@ -100,16 +108,26 @@ class ElementWarpper {
         range.setEnd(this.root, this.root.childNodes.length);
         component[RENDER_TO_DOM](range);
     }
-
+*/
     [RENDER_TO_DOM](range) {
         range.deleteContents();
         range.insertNode(this.root);
     }
 
+    get vdom() {
+        return {
+            type: this.type,
+            props: this.props,
+            children: this.children.map(child=> child.vdom)
+        }
+    }
+
 }
 
-class TextWarpper {
+class TextWarpper extends Component{
     constructor(content) {
+        super(content)
+        this.content = content
         this.root = document.createTextNode(content);
     }
     // Text不会有子节点，也不会append子节点
@@ -117,6 +135,14 @@ class TextWarpper {
     [RENDER_TO_DOM](range) {
         range.deleteContents();
         range.insertNode(this.root);
+    }
+
+
+    get vdom() {
+        return {
+            type: "#text",
+            content: this.content
+        }
     }
 }
 
