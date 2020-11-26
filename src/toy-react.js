@@ -8,8 +8,8 @@ export class Component {
     }
 
     setAttribute(name, value) {
-
         this.props[name] = value;
+
     }
 
     appendChild(component) {
@@ -20,40 +20,107 @@ export class Component {
     // 操作&重新渲染，这里使用了Symbol，方括号形式
     [RENDER_TO_DOM](range) {
         //使用Range的API来定位
-        this.render()[RENDER_TO_DOM](range);//替代了getRoot的方式
+        // this.render()[RENDER_TO_DOM](range);//替代了getRoot的方式
         this._range = range;
+        this._vdom = this.vdom;
+        this._vdom[RENDER_TO_DOM](range)
+
+    }
+    /*
+        rerender() {
+            // 此处由于Range的自动合并特性，需要做一些Trick处理
+            // 保存旧的Range
+            let oldRange = this._range;
+            // 防止自动合并 前面插入一个Range
+            let range = document.createRange();
+            // 这都是API内容
+            range.setStart(oldRange.startContainer, oldRange.startOffset)
+            range.setEnd(oldRange.startContainer, oldRange.startOffset)
+            
+            this[RENDER_TO_DOM](range);
+    
+            // 把旧的Range移动到新的Range之后，然后再删除
+            oldRange.setStart(range.endContainer, range.endOffset);
+            oldRange.deleteContents();
+        }*/
+
+    update() {
+        let isSameNode = (oldNode, newNode) => {
+            if (oldNode.tpye !== newNode.type) {
+                return false;
+            }
+
+            for (let name in newNode.props) {
+                if (newNode, this.props[name] !== oldNode.props[name]) {
+                    return false;
+                }
+            }
+
+            if (Object.keys(oldNode.props).length > Object.keys(newNode.props).length) {
+                return false;
+            }
+
+            if (newNode.type === "#text") {
+                if (newNode.content !== oldNode.content) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        let update = (oldNode, newNode) => {
+            //type,props,children
+            //#text content
+            if (!isSameNode(oldNode, newNode)) {
+                newNode[RENDER_TO_DOM](oldNode._range);
+                return;
+            }
+            newNode._range = oldNode._range;
+
+            let newChildren = newNode.vchildren;
+            let oldChildren = oldNode.vchildren;
+
+            if (!newChildren || !newChildren.length) {
+                return;
+            }
+
+            let tailRange = oldChildren[oldChildren.length - 1]._range;
+
+            for (let i = 0; i < newChildren.length; i++) {
+                let newChild = newChildren[i];
+                let oldChild = oldChildren[i];
+                if (i < oldChildren.length) {
+                    update(oldChildren, newChildren);
+                } else {
+                    let range = document.createRange();
+                    range.setStart(tailRange.endContainer, tailRange.endOffset);
+                    range.setEnd(tailRange.endContainer, tailRange.endOffset);
+                    newChild[RENDER_TO_DOM](range);
+                    tailRange = range;
+                }
+            }
+
+        }
+        let vdom = this.vdom;
+        update(this._vdom, vdom);
+        this._vdom = vdom;
     }
 
-    rerender() {
-        // 此处由于Range的自动合并特性，需要做一些Trick处理
-        // 保存旧的Range
-        let oldRange = this._range;
-        // 防止自动合并 前面插入一个Range
-        let range = document.createRange();
-        // 这都是API内容
-        range.setStart(oldRange.startContainer, oldRange.startOffset)
-        range.setEnd(oldRange.startContainer, oldRange.startOffset)
-        
-        this[RENDER_TO_DOM](range);
 
-        // 把旧的Range移动到新的Range之后，然后再删除
-        oldRange.setStart(range.endContainer, range.endOffset);
-        oldRange.deleteContents();
-    }
 
     setState(newState) {
         // 如果一上来就是空的state，或者都不是对象，就给他新State并rerender
         // 经典判断条件，js的null跟object的坑，一定要两个联合使用
-        if(this.state === null || typeof this.state !== "object") {
+        if (this.state === null || typeof this.state !== "object") {
             this.state = newState;
             this.rerender();
             return
         }
 
-        let merge = function(oldState, newState) {
+        let merge = (oldState, newState) => {
             // 把newState的所有属性抄写到oldState上面
-            for(let p in newState) {
-                if(oldState[p] === null || typeof oldState[p] !== "object") {
+            for (let p in newState) {
+                if (oldState[p] === null || typeof oldState[p] !== "object") {
                     oldState[p] = newState[p];
                 } else {
                     // 递归调用，深拷贝
@@ -66,6 +133,8 @@ export class Component {
         this.rerender();
     }
 
+
+
     get vdom() {
         // 可能会出现递归
         return this.render().vdom;
@@ -73,13 +142,12 @@ export class Component {
 
 }
 
-class ElementWarpper extends Component{
+class ElementWarpper extends Component {
     constructor(type) {
         super(type)
         this.type = type
-        this.root = document.createElement(type);
     }
-/*
+    /*
     // 设置this.props
     setAttribute(name, value) {
         // 希望把on开头的属性单独处理 因为它是事件绑定
@@ -108,42 +176,88 @@ class ElementWarpper extends Component{
         range.setEnd(this.root, this.root.childNodes.length);
         component[RENDER_TO_DOM](range);
     }
-*/
+    */
     [RENDER_TO_DOM](range) {
-        range.deleteContents();
-        range.insertNode(this.root);
-    }
+        // range.deleteContents();
+        // range.insertNode(this.root);
+        this._range = range;
 
+        let root = document.createElement(this.type);
+
+        for (let name in this.props) {
+            let value = this.props[name];
+            if (name.match(/^([\s\S]+)$/)) {
+                console.log("value", value);
+                root.addEventListener(RegExp.$1.replace(/^[\s\S]/, c => c.toLocaleLowerCase()), value)
+            } else {
+                if (name === "className") {
+                    root.setAttribute("class", value);
+                } else {
+                    root.setAttribute(name, value);
+                }
+            }
+        }
+
+        if (!this.vchildren) {
+            this.vchildren = this.children.map(child => child.vdom)
+        }
+
+        for (let child of this.vchildren) {
+            let childRange = document.createRange();
+            childRange.setStart(root, root.childNodes.length);
+            childRange.setEnd(root, root.childNodes.length);
+            child[RENDER_TO_DOM](childRange);
+        }
+
+        replaceContent(range, root);
+    }
+    
     get vdom() {
-        return {
+        /*return {
             type: this.type,
             props: this.props,
             children: this.children.map(child=> child.vdom)
-        }
+        }*/
+        this.vchildren = this.children.map(child =>child.vdom);
+        return this;
     }
 
 }
 
-class TextWarpper extends Component{
+class TextWarpper extends Component {
     constructor(content) {
-        super(content)
-        this.content = content
-        this.root = document.createTextNode(content);
+        super(content);
+        this.type = "#text";
+        this.content = content;
     }
     // Text不会有子节点，也不会append子节点
 
-    [RENDER_TO_DOM](range) {
-        range.deleteContents();
-        range.insertNode(this.root);
-    }
 
+
+    [RENDER_TO_DOM](range) {
+        // range.deleteContents();
+        // range.insertNode(this.root);
+        this._range = range;
+        let root = document.createTextNode(this.content);
+        replaceContent(range, root);
+    }
 
     get vdom() {
-        return {
+        return this;
+        /*{
             type: "#text",
             content: this.content
-        }
+        }*/
     }
+}
+
+function replaceContent(range, node) {
+    range.insertNode(node);
+    range.setStartAfter(node);
+    range.deleteContent();
+
+    range.setStartBefore(node);
+    range.setEndAfter(node);
 }
 
 export function createElement(type, attributes, ...children) {
@@ -152,7 +266,7 @@ export function createElement(type, attributes, ...children) {
         // 普通结点元素
         // element = document.createElement(type);
         element = new ElementWarpper(type);
-        
+
     } else {
         // 若为class 则实例化一下 变成真正的DOM对象
         // 但是这导致element不是原生对象，没有appendChild、setAttribute方法
@@ -162,19 +276,19 @@ export function createElement(type, attributes, ...children) {
     }
 
     // 所有属性被存放在了attributes对象上，所以需要使用迭代for in
-    for(let name in attributes) {
+    for (let name in attributes) {
         element.setAttribute(name, attributes[name]);
-    //  为什么不用element[name] = attributes[name];这个叫property，上面的才是attribute
-    //  property理解为js对象，attribute为DOM的字符串，
-    //  DOM有默认的几个基本property 不需要在HTML中显式写出(一个空div自动就有超级多的key，这正是虚拟DOM存在的必要)
-    //  而attributes一般是手动赋值的，因此attributes是属于property的一个子集，输出attribute可看出其为key="value"
-    //  property的修改不影响attributes，而attributes的修改会影响property
+        //  为什么不用element[name] = attributes[name];这个叫property，上面的才是attribute
+        //  property理解为js对象，attribute为DOM的字符串，
+        //  DOM有默认的几个基本property 不需要在HTML中显式写出(一个空div自动就有超级多的key，这正是虚拟DOM存在的必要)
+        //  而attributes一般是手动赋值的，因此attributes是属于property的一个子集，输出attribute可看出其为key="value"
+        //  property的修改不影响attributes，而attributes的修改会影响property
     }
 
     // children可能嵌套着需要展开的children，此处定义一个递归的箭头函数
     let insertChildren = (children) => {
         // children是个数组，因此要用for of来循环
-        for(let child of children) {
+        for (let child of children) {
             // 单独处理文本节点
             if (typeof child === "string") {
                 // child = document.createTextNode(child);
@@ -182,7 +296,7 @@ export function createElement(type, attributes, ...children) {
             }
 
             // 实际操作发现child可能会传进来null
-            if(child === null) {
+            if (child === null) {
                 continue;
             }
 
