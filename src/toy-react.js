@@ -25,8 +25,20 @@ export class Component {
     }
 
     rerender() {
-        this._range.deleteContents();
-        this[RENDER_TO_DOM](this._range);
+        // 此处由于Range的自动合并特性，需要做一些Trick处理
+        // 保存旧的Range
+        let oldRange = this._range;
+        // 防止自动合并 前面插入一个Range
+        let range = document.createRange();
+        // 这都是API内容
+        range.setStart(oldRange.startContainer, oldRange.startOffset)
+        range.setEnd(oldRange.startContainer, oldRange.startOffset)
+        
+        this[RENDER_TO_DOM](range);
+
+        // 把旧的Range移动到新的Range之后，然后再删除
+        oldRange.setStart(range.endContainer, range.endOffset);
+        oldRange.deleteContents();
     }
 
     setState(newState) {
@@ -69,8 +81,14 @@ class ElementWarpper {
             // 由于使用了()，则可以捕获到该位置的值
             // 确保事件名是小写的
             this.root.addEventListener(RegExp.$1.replace(/^[\s\S]/, c=> c.toLowerCase()), value)
+        } else {
+            // 将className处理为class
+            if(name === "className") {
+                this.root.setAttribute("class", value);
+            } else {
+                this.root.setAttribute(name, value);
+            }
         }
-        this.root.setAttribute(name, value);
     }
 
     appendChild(component) {
@@ -136,6 +154,13 @@ export function createElement(type, attributes, ...children) {
                 // child = document.createTextNode(child);
                 child = new TextWarpper(child);
             }
+
+            // 实际操作发现child可能会传进来null
+            if(child === null) {
+                continue;
+            }
+
+
             //为了将数组形式的多个children展开 需要进行判断
             if ((typeof child === "object") && (child instanceof Array)) {
                 insertChildren(child);
