@@ -29,6 +29,31 @@ export class Component {
         this[RENDER_TO_DOM](this._range);
     }
 
+    setState(newState) {
+        // 如果一上来就是空的state，或者都不是对象，就给他新State并rerender
+        // 经典判断条件，js的null跟object的坑，一定要两个联合使用
+        if(this.state === null || typeof this.state !== "object") {
+            this.state = newState;
+            this.rerender();
+            return
+        }
+
+        let merge = function(oldState, newState) {
+            // 把newState的所有属性抄写到oldState上面
+            for(let p in newState) {
+                if(oldState[p] === null || typeof oldState[p] !== "object") {
+                    oldState[p] = newState[p];
+                } else {
+                    // 递归调用，深拷贝
+                    merge(oldState[p], newState[p]);
+                }
+            }
+        }
+
+        merge(this.state, newState);
+        this.rerender();
+    }
+
 }
 
 class ElementWarpper {
